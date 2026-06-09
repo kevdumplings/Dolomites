@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dolomites Itinerary — Sept 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+<style>
+  :root {
+    --cream: #f4f0e8;
+    --ink: #1a1814;
+    --pine: #2d4a3e;
+    --stone: #8a7e6e;
+    --gold: #c9a84c;
+    --mist: #ddd8cc;
+    --snow: #faf8f4;
+    --accent: #4a7c6f;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'DM Mono', monospace;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  header {
+    background: var(--pine);
+    color: var(--cream);
+    padding: 1.25rem 2rem 1rem;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 220px; height: 220px;
+    border: 1px solid rgba(201,168,76,0.2);
+    border-radius: 50%;
+  }
+  header::after {
+    content: '';
+    position: absolute;
+    top: -30px; right: -30px;
+    width: 120px; height: 120px;
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: 50%;
+  }
+  .header-label { font-size: 0.62rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--gold); margin-bottom: 0.25rem; }
+  header h1 { font-family: 'Playfair Display', serif; font-size: clamp(1.3rem, 3vw, 1.9rem); font-weight: 700; line-height: 1.15; }
+  header h1 em { font-style: italic; color: var(--gold); }
+  .header-dates { font-size: 0.62rem; letter-spacing: 0.08em; color: rgba(244,240,232,0.55); margin-top: 0.3rem; }
+
+  .container { display: grid; grid-template-columns: 320px 1fr; flex: 1; overflow: hidden; }
+
+  .sidebar { background: var(--snow); border-right: 1px solid var(--mist); overflow-y: auto; }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: var(--mist); }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--stone); border-radius: 2px; }
+
+  .day-group { border-bottom: 1px solid var(--mist); }
+
+  .day-header {
+    padding: 0.85rem 1.25rem 0.7rem;
+    cursor: pointer; display: flex; align-items: center; gap: 0.75rem;
+    transition: background 0.15s; user-select: none;
+    position: sticky; top: 0; background: var(--snow); z-index: 2;
+  }
+  .day-header:hover { background: var(--mist); }
+  .day-header.active { background: var(--pine); color: var(--cream); }
+  .day-header.active .day-label { color: var(--gold); }
+  .day-header.active .day-title { color: var(--cream); }
+  .day-header.active .day-date { color: rgba(244,240,232,0.55); }
+  .day-header.active .day-dot { background: var(--gold); color: var(--ink); }
+
+  .day-dot {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--pine); color: var(--cream);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.6rem; font-weight: 500; flex-shrink: 0;
+  }
+  .day-label { font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); display: block; }
+  .day-title { font-family: 'Playfair Display', serif; font-size: 0.88rem; color: var(--ink); display: block; line-height: 1.2; }
+  .day-date { font-size: 0.57rem; color: var(--stone); display: block; margin-top: 0.1rem; }
+
+  .stops-list { padding: 0 0 0.5rem; display: none; }
+  .stops-list.open { display: block; }
+
+  .stop-item {
+    padding: 0.55rem 1.25rem 0.55rem 1.5rem;
+    cursor: pointer; display: flex; align-items: flex-start; gap: 0.7rem;
+    transition: background 0.1s; border-left: 3px solid transparent;
+  }
+  .stop-item:hover { background: rgba(45,74,62,0.06); }
+  .stop-item.active { border-left-color: var(--gold); background: rgba(201,168,76,0.08); }
+
+  .stop-time { font-size: 0.58rem; color: var(--stone); white-space: nowrap; min-width: 50px; padding-top: 2px; }
+  .stop-name { font-size: 0.76rem; font-weight: 500; color: var(--ink); line-height: 1.3; }
+  .stop-type { font-size: 0.58rem; color: var(--stone); margin-top: 0.1rem; }
+  .stop-optional { font-size: 0.54rem; background: var(--gold); color: var(--ink); padding: 1px 4px; border-radius: 2px; margin-left: 0.3rem; vertical-align: middle; }
+  .stop-drive { font-size: 0.58rem; color: var(--accent); margin-top: 0.1rem; }
+  .stop-accommodation { font-size: 0.58rem; color: var(--pine); margin-top: 0.1rem; font-weight: 500; }
+
+  .map-container { position: relative; }
+  #map { width: 100%; height: 100%; }
+
+  /* INFO PANEL */
+  .info-panel {
+    position: absolute;
+    bottom: 1.5rem; right: 1.5rem;
+    background: var(--snow); border: 1px solid var(--mist);
+    padding: 1rem 1.3rem 1.1rem;
+    width: 280px;
+    box-shadow: 0 4px 24px rgba(26,24,20,0.16);
+    z-index: 999; display: none;
+  }
+  .info-panel.visible { display: block; }
+  .info-panel-label { font-size: 0.54rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); margin-bottom: 0.2rem; }
+  .info-panel-name { font-family: 'Playfair Display', serif; font-size: 1rem; margin-bottom: 0.2rem; line-height: 1.2; }
+  .info-panel-time { font-size: 0.63rem; color: var(--stone); margin-bottom: 0.4rem; }
+  .info-panel-desc { font-size: 0.68rem; color: var(--stone); line-height: 1.6; border-top: 1px solid var(--mist); padding-top: 0.4rem; }
+  .info-panel-address { font-size: 0.63rem; color: var(--pine); margin-top: 0.4rem; border-top: 1px solid var(--mist); padding-top: 0.4rem; line-height: 1.6; white-space: pre-line; display: none; }
+  .info-panel-close { position: absolute; top: 0.6rem; right: 0.7rem; background: none; border: none; cursor: pointer; font-size: 0.9rem; color: var(--stone); }
+  .directions-btn {
+    display: flex; align-items: center; gap: 0.4rem;
+    margin-top: 0.75rem; padding: 0.5rem 0.75rem;
+    background: var(--pine); color: var(--cream);
+    font-family: 'DM Mono', monospace; font-size: 0.65rem;
+    letter-spacing: 0.06em; border: none; cursor: pointer;
+    text-decoration: none; width: 100%; justify-content: center;
+    transition: background 0.15s;
+  }
+  .directions-btn:hover { background: var(--accent); }
+
+  /* LEGEND */
+  .legend-wrapper {
+    position: absolute; top: 1rem; right: 1rem; z-index: 999;
+  }
+  .legend-toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--pine); color: var(--cream);
+    padding: 0.4rem 0.7rem; cursor: pointer;
+    font-family: 'DM Mono', monospace; font-size: 0.6rem;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    border: none; width: 100%; gap: 0.6rem;
+  }
+  .legend-toggle-icon { font-size: 0.7rem; transition: transform 0.2s; }
+  .legend-toggle-icon.open { transform: rotate(180deg); }
+  .legend-body {
+    background: var(--snow); border: 1px solid var(--mist);
+    border-top: none; padding: 0.6rem 0.9rem 0.65rem;
+    display: none;
+  }
+  .legend-body.visible { display: block; }
+  .legend-item { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.25rem; color: var(--ink); font-size: 0.62rem; }
+  .legend-item:last-child { margin-bottom: 0; }
+  .legend-swatch { width: 22px; height: 4px; border-radius: 2px; flex-shrink: 0; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+  /* STYLE TOGGLE */
+  .style-toggle { position: absolute; top: 1rem; left: 1rem; display: flex; z-index: 999; }
+  .style-btn {
+    padding: 0.4rem 0.75rem; font-family: 'DM Mono', monospace; font-size: 0.6rem;
+    letter-spacing: 0.06em; border: 1px solid var(--mist);
+    background: var(--snow); color: var(--stone); cursor: pointer; transition: all 0.15s;
+  }
+  .style-btn:first-child { border-right: none; }
+  .style-btn.active { background: var(--pine); color: var(--cream); border-color: var(--pine); }
+
+  .mapboxgl-marker { cursor: pointer; }
+
+  /* NUMBERED MARKER */
+  .num-marker {
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; border: 2.5px solid white;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.35);
+    cursor: pointer; font-family: 'DM Mono', monospace;
+    font-weight: 500; color: white; transition: transform 0.15s;
+    line-height: 1;
+  }
+  .num-marker:hover { transform: scale(1.2); }
+
+  /* MOBILE */
+  @media (max-width: 700px) {
+    body { height: auto; min-height: 100vh; overflow: auto; }
+    .container { grid-template-columns: 1fr; grid-template-rows: auto auto; }
+    /* Map on top, sidebar below */
+    .map-container { order: 1; height: 55vw; min-height: 260px; position: relative; }
+    .sidebar { order: 2; max-height: none; overflow-y: visible; padding-bottom: env(safe-area-inset-bottom, 80px); }
+    .info-panel { width: calc(100% - 2rem); right: 1rem; left: 1rem; bottom: 1rem; }
+    header { padding: 1rem 1.25rem 0.85rem; }
+    header h1 { font-size: 1.2rem; }
+    .legend-wrapper { top: 0.6rem; right: 0.6rem; }
+    .style-toggle { top: 0.6rem; left: 0.6rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-label">Road Trip — Italian Dolomites</div>
+  <h1>Six Days in <em>The Alps</em></h1>
+  <div class="header-dates">06 — 11 September 2026 &nbsp;·&nbsp; London → Venice → London</div>
+</header>
+
+<div class="container">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="map-container">
+    <div id="map"></div>
+
+    <div class="style-toggle">
+      <button class="style-btn active" id="btn-streets" onclick="setStyle('streets')">Streets</button>
+      <button class="style-btn" id="btn-satellite" onclick="setStyle('satellite')">Satellite</button>
+    </div>
+
+    <div class="legend-wrapper">
+      <button class="legend-toggle" onclick="toggleLegend()">
+        <span>Legend</span>
+        <span class="legend-toggle-icon" id="legendIcon">▼</span>
+      </button>
+      <div class="legend-body visible" id="legendBody">
+        <div id="legend-items"></div>
+      </div>
+    </div>
+
+    <div class="info-panel" id="infoPanel">
+      <button class="info-panel-close" onclick="closeInfo()">✕</button>
+      <div class="info-panel-label" id="infoDayLabel"></div>
+      <div class="info-panel-name" id="infoName"></div>
+      <div class="info-panel-time" id="infoTime"></div>
+      <div class="info-panel-desc" id="infoDesc"></div>
+      <div class="info-panel-address" id="infoAddress"></div>
+      <a class="directions-btn" id="directionsBtn" href="#" target="_blank" rel="noopener">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        Open in Google Maps
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+mapboxgl.accessToken = 'pk.eyJ1Ijoia2V2dDEiLCJhIjoiY21xNzRma2VlMDdmZjJyc2JyMmU1d2E2ayJ9.YQWkiYyH9miMxLxYVaDJ5Q';
+
+const STYLES = {
+  streets: 'mapbox://styles/mapbox/streets-v12',
+  satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
+};
+
+const DAY_COLORS = {
+  0: '#2d4a3e',
+  1: '#b8920e',
+  2: '#4a7c6f',
+  3: '#7a5c3e',
+  4: '#5c6b8a',
+  5: '#8a4a4a',
+};
+
+const AIRBNBS = [
+  { id: 'airbnb1', name: "Airbnb — Cortina d'Ampezzo", address: "Via del Castello, 18\nCortina d'Ampezzo, Veneto 32043", checkin: "Check-in from 5pm", nights: "Sun 06 – Tue 08 Sept", lat: 46.54164, lng: 12.13461 },
+  { id: 'airbnb2', name: "Airbnb — Merano", address: "Via Karl Wolf, 1\nMerano, Trentino-Alto Adige 39012", checkin: "Check-in from 4pm", nights: "Tue 08 – Thu 10 Sept", lat: 46.67469, lng: 11.15881 },
+];
+
+const DAYS = [
+  {
+    id: 0, day: 'Sun', date: '06 Sept',
+    title: 'Arrival Day', subtitle: 'Venice → Braies → Cortina',
+    stops: [
+      { time: '07:15', name: 'London Heathrow', type: 'Depart ✈', lat: 51.4700, lng: -0.4543, desc: 'Early morning flight from London.' },
+      { time: '~10:30', name: 'Venice Marco Polo Airport', type: 'Land & collect hire car', lat: 45.5047, lng: 12.3466, desc: 'Land, collect bags, pick up hire car. Allow ~1hr.' },
+      { time: '~14:00', name: 'Lago di Braies', type: 'Scenic stop — pre-book parking', lat: 46.6943, lng: 12.0854, desc: 'Arrive before the 4pm access restriction lifts. Pre-book parking in advance — restrictions run until 15 Sept. Golden afternoon light on the lake.', drive: '~2.5hr from Venice' },
+      { time: 'from 5pm', name: "Airbnb — Cortina d'Ampezzo", type: 'Check-in · Via del Castello, 18', lat: 46.54164, lng: 12.13461, desc: "Check in from 5pm. Dinner in town.", drive: '~45min from Braies', address: "Via del Castello, 18\nCortina d'Ampezzo, Veneto 32043\n\nCheck-in from 5pm\nStaying Sun 06 – Tue 08 Sept" },
+    ]
+  },
+  {
+    id: 1, day: 'Mon', date: '07 Sept',
+    title: 'Tre Cime Day', subtitle: 'Misurina + Tre Cime + Cadini + Passo Giau',
+    stops: [
+      { time: '~08:30', name: 'Lago di Misurina', type: 'En route scenic stop', lat: 46.5826, lng: 12.2544, desc: 'Beautiful alpine lake on the road to Rifugio Auronzo. Easy 20–30 min stop. The Tre Cime peaks reflect in the water on clear mornings.', drive: '~45min from Cortina' },
+      { time: '~09:30', name: 'Rifugio Auronzo — Tre Cime', type: 'Hike — pre-book toll road parking', lat: 46.6122, lng: 12.2962, desc: 'Pre-booking is mandatory — without a reservation you will be turned away at the toll gate. The iconic 10–11km loop around the three peaks. Allow 3.5–4hrs.', drive: '~20min from Misurina' },
+      { time: '~14:00', name: 'Cadini di Misurina', type: 'Hike — same car park', lat: 46.6050, lng: 12.3050, desc: 'From the same Rifugio Auronzo car park. Short 2km round-trip to the famous jagged ridge viewpoint. Allow 1–1.5hrs.', drive: 'Same car park' },
+      { time: '~18:00', name: 'Passo Giau', type: 'Sunset — Optional', lat: 46.4831, lng: 12.0542, desc: 'One of the most scenic passes in the Dolomites. 360° panoramic views. Only attempt if energy allows.', drive: '~50min from Auronzo', optional: true },
+      { time: '~19:30', name: "Return — Cortina Airbnb", type: 'Back to base', lat: 46.54164, lng: 12.13461, desc: "Return to the Airbnb. Well-earned dinner in Cortina.", drive: '~30min from Passo Giau' },
+    ]
+  },
+  {
+    id: 2, day: 'Tue', date: '08 Sept',
+    title: 'Lago di Sorapis', subtitle: 'Cortina → Sorapis → Merano',
+    stops: [
+      { time: '~08:00', name: 'Lago di Sorapis Trailhead', type: 'Hike — start early', lat: 46.5561, lng: 12.2046, desc: 'One of the most dramatic hikes near Cortina. Turquoise glacial lake surrounded by sheer cliffs. ~12km round trip, 4–5hrs. Some exposed sections with ropes — proper boots essential.', drive: '~20min from Cortina' },
+      { time: '~13:30', name: "Cortina d'Ampezzo", type: 'Collect bags / lunch', lat: 46.5378, lng: 12.1359, desc: 'Return to collect bags from the Airbnb. Grab lunch before the drive west.', drive: '~20min from trailhead' },
+      { time: 'from 4pm', name: 'Airbnb — Merano', type: 'Check-in · Via Karl Wolf, 1', lat: 46.67469, lng: 11.15881, desc: 'Check-in from 4pm. Dinner in Merano — explore the historic centre.', drive: '~2hrs from Cortina', address: "Via Karl Wolf, 1\nMerano, Trentino-Alto Adige 39012\n\nCheck-in from 4pm\nStaying Tue 08 – Thu 10 Sept" },
+    ]
+  },
+  {
+    id: 3, day: 'Wed', date: '09 Sept',
+    title: 'Seceda', subtitle: 'Merano → Ortisei → Val di Funes → Merano',
+    stops: [
+      { time: '~08:00', name: 'Drive to Ortisei', type: '~1hr from Merano', lat: 46.5748, lng: 11.6711, desc: 'Drive from Merano to Ortisei. Arrive in time for the first cable car.', drive: '~1hr from Merano' },
+      { time: '~09:15', name: 'Seceda Cable Car', type: 'Cable car — buy tickets in advance', lat: 46.5765, lng: 11.6749, desc: 'Two-stage cable car from Ortisei up to Seceda ridge (2,519m). Iconic jagged Geisler peaks backdrop. Book online — queues can be long. Allow a full morning up top.', drive: 'Walking distance in Ortisei' },
+      { time: '~14:00', name: 'Ortisei', type: 'Lunch in town', lat: 46.5748, lng: 11.6711, desc: 'Return to Ortisei for lunch before the afternoon drive.', drive: 'Cable car down' },
+      { time: '~18:00', name: 'Val di Funes — St Johann Viewpoint', type: 'Sunset — Optional', lat: 46.6367, lng: 11.7221, desc: 'The famous church-and-peaks viewpoint. Golden hour light on the Odle/Geisler group is extraordinary. Free photo spot outside the paid area.', drive: '~20min from Ortisei', optional: true },
+      { time: '~20:30', name: 'Return — Merano Airbnb', type: 'Back to base', lat: 46.67469, lng: 11.15881, desc: 'Return to Merano for dinner. ~1hr from Ortisei.', drive: '~1hr from Ortisei' },
+    ]
+  },
+  {
+    id: 4, day: 'Thu', date: '10 Sept',
+    title: 'Alpe di Siusi', subtitle: 'Merano → Alpe di Siusi → Merano',
+    stops: [
+      { time: '~08:30', name: 'Alpe di Siusi', type: 'Hike — ~1hr from Merano', lat: 46.5423, lng: 11.6169, desc: "Europe's largest high-alpine meadow with views of the Sassolungo and Sciliar. Access by gondola or drive up early before road restrictions. Full morning of easy hiking.", drive: '~1hr from Merano' },
+      { time: '~14:00', name: 'Alpe di Siusi — afternoon', type: 'Linger or descend', lat: 46.5500, lng: 11.6300, desc: 'Lunch at a mountain hut, or descend and take a slow drive back to Merano.' },
+      { time: 'Evening', name: 'Merano Airbnb', type: 'Final mountain night', lat: 46.67469, lng: 11.15881, desc: 'Return to Merano. Relax, final dinner. Pack for Venice drive tomorrow.', drive: '~1hr from Alpe di Siusi' },
+    ]
+  },
+  {
+    id: 5, day: 'Fri', date: '11 Sept',
+    title: 'Return Day', subtitle: 'Merano → Venice → London',
+    stops: [
+      { time: 'Morning', name: 'Merano — Depart', type: 'Early start', lat: 46.67469, lng: 11.15881, desc: 'Leave by mid-morning to reach Venice comfortably before your 21:30 flight. ~2.5hrs via A22 motorway. Aim to return car and check in by 18:30–19:00.' },
+      { time: '~13:00', name: 'Venice Marco Polo Airport', type: 'Return car & check in ✈', lat: 45.5047, lng: 12.3466, desc: 'Return hire car. Check in for flight. Flight departs 21:30 — plenty of time to explore the airport or grab a meal.', drive: '~2.5hrs from Merano' },
+      { time: '21:30', name: 'Flight to London', type: 'Depart ✈', lat: 45.5047, lng: 12.3466, desc: 'Depart Venice 21:30. Safe travels!' },
+    ]
+  },
+];
+
+// ── LEGEND TOGGLE ──
+let legendOpen = true;
+function toggleLegend() {
+  legendOpen = !legendOpen;
+  document.getElementById('legendBody').classList.toggle('visible', legendOpen);
+  document.getElementById('legendIcon').classList.toggle('open', legendOpen);
+  document.getElementById('legendIcon').textContent = legendOpen ? '▲' : '▼';
+}
+
+// ── MAP ──
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: STYLES.streets,
+  center: [11.8, 46.4],
+  zoom: 8,
+});
+map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+
+let currentStyle = 'streets';
+let mapMarkers = [], airbnbMarkerEls = [], activeDay = null, activeStop = null, routeLayers = [];
+
+function setStyle(style) {
+  currentStyle = style;
+  document.getElementById('btn-streets').classList.toggle('active', style === 'streets');
+  document.getElementById('btn-satellite').classList.toggle('active', style === 'satellite');
+  map.setStyle(STYLES[style]);
+  map.once('style.load', () => { plotAll(); plotAirbnbs(); });
+}
+
+// ── LEGEND ──
+const legendEl = document.getElementById('legend-items');
+DAYS.forEach(d => {
+  legendEl.innerHTML += `<div class="legend-item">
+    <div class="legend-swatch" style="background:${DAY_COLORS[d.id]}"></div>
+    <span>${d.day} · ${d.title}</span>
+  </div>`;
+});
+legendEl.innerHTML += `<div class="legend-item" style="margin-top:0.35rem;padding-top:0.35rem;border-top:1px solid var(--mist)">
+  <div class="legend-dot" style="background:var(--pine)"></div>
+  <span>Airbnb</span>
+</div>`;
+
+// ── SIDEBAR ──
+const sb = document.getElementById('sidebar');
+DAYS.forEach(d => {
+  const group = document.createElement('div');
+  group.className = 'day-group';
+  group.id = `day-group-${d.id}`;
+
+  const header = document.createElement('div');
+  header.className = 'day-header';
+  header.id = `day-header-${d.id}`;
+  header.innerHTML = `
+    <div class="day-dot" id="day-dot-${d.id}">${d.day}</div>
+    <div>
+      <span class="day-label">${d.date}</span>
+      <span class="day-title">${d.title}</span>
+      <span class="day-date">${d.subtitle}</span>
+    </div>`;
+  header.onclick = () => activateDay(d.id);
+
+  const list = document.createElement('div');
+  list.className = 'stops-list';
+  list.id = `stops-list-${d.id}`;
+
+  d.stops.forEach((s, i) => {
+    const isAccom = !!s.address;
+    const item = document.createElement('div');
+    item.className = 'stop-item';
+    item.id = `stop-item-${d.id}-${i}`;
+    item.innerHTML = `
+      <div class="stop-time">${s.time}</div>
+      <div class="stop-info">
+        <div class="stop-name">${i + 1}. ${s.name}${s.optional ? '<span class="stop-optional">optional</span>' : ''}</div>
+        <div class="stop-type">${s.type}</div>
+        ${s.drive ? `<div class="stop-drive">↳ ${s.drive}</div>` : ''}
+        ${isAccom ? `<div class="stop-accommodation">🏠 Accommodation</div>` : ''}
+      </div>`;
+    item.onclick = (e) => { e.stopPropagation(); selectStop(d.id, i); };
+    list.appendChild(item);
+  });
+
+  group.appendChild(header);
+  group.appendChild(list);
+  sb.appendChild(group);
+});
+
+// ── MARKERS ──
+function createNumberedMarker(number, color, size, opacity, onClick) {
+  const el = document.createElement('div');
+  el.className = 'num-marker';
+  el.style.cssText = `width:${size}px;height:${size}px;background:${color};opacity:${opacity};font-size:${Math.round(size * 0.45)}px;`;
+  el.textContent = number;
+  el.onclick = onClick;
+  return el;
+}
+
+function createAirbnbMarker(label) {
+  const el = document.createElement('div');
+  el.innerHTML = `<div style="background:#2d4a3e;color:#f4f0e8;font-family:'DM Mono',monospace;font-size:0.55rem;padding:4px 8px;border-radius:3px;white-space:nowrap;border:1px solid rgba(255,255,255,0.35);box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;display:flex;align-items:center;gap:4px;">🏠 ${label}</div>`;
+  return el;
+}
+
+// ── PLOT ──
+function clearMap() {
+  mapMarkers.forEach(m => m.remove());
+  mapMarkers = [];
+  routeLayers.forEach(id => {
+    if (map.getLayer(id)) map.removeLayer(id);
+    if (map.getSource(id)) map.removeSource(id);
+  });
+  routeLayers = [];
+}
+
+function plotAll() {
+  clearMap();
+  DAYS.forEach(d => {
+    const color = DAY_COLORS[d.id];
+    const dimmed = activeDay !== null && activeDay !== d.id;
+    const isActive = activeDay === d.id;
+
+    // Route line — always add, just vary opacity
+    const coords = d.stops.map(s => [s.lng, s.lat]);
+    const sourceId = `route-src-${d.id}`;
+    const layerId = `route-lyr-${d.id}`;
+
+    try {
+      map.addSource(sourceId, {
+        type: 'geojson',
+        data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } }
+      });
+      map.addLayer({
+        id: layerId,
+        type: 'line',
+        source: sourceId,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': color,
+          'line-width': isActive ? 4 : 2,
+          'line-opacity': dimmed ? 0.1 : (isActive ? 1 : 0.5),
+        }
+      });
+      routeLayers.push(sourceId, layerId);
+    } catch(e) { /* layer already exists — skip */ }
+
+    // Numbered markers
+    d.stops.forEach((s, i) => {
+      const isAccom = !!s.address;
+      const mColor = isAccom ? '#2d4a3e' : (s.optional ? '#b8920e' : color);
+      const size = isActive ? 26 : 20;
+      const opacity = dimmed ? 0.25 : 1;
+      const el = createNumberedMarker(i + 1, mColor, size, opacity, () => {
+        if (activeDay !== d.id) activateDay(d.id);
+        selectStop(d.id, i);
+      });
+      const m = new mapboxgl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([s.lng, s.lat])
+        .addTo(map);
+      mapMarkers.push(m);
+    });
+  });
+}
+
+function plotAirbnbs() {
+  airbnbMarkerEls.forEach(m => m.remove());
+  airbnbMarkerEls = [];
+  AIRBNBS.forEach(a => {
+    const label = a.id === 'airbnb1' ? 'Cortina' : 'Merano';
+    const el = createAirbnbMarker(label);
+    el.onclick = () => showAirbnbInfo(a);
+    const m = new mapboxgl.Marker({ element: el, anchor: 'bottom-left' })
+      .setLngLat([a.lng, a.lat])
+      .addTo(map);
+    airbnbMarkerEls.push(m);
+  });
+}
+
+// ── INTERACTIONS ──
+function activateDay(dayId) {
+  if (activeDay === dayId) { deactivateDay(dayId); return; }
+  if (activeDay !== null) {
+    document.getElementById(`day-header-${activeDay}`).classList.remove('active');
+    document.getElementById(`stops-list-${activeDay}`).classList.remove('open');
+  }
+  activeDay = dayId;
+  document.getElementById(`day-header-${dayId}`).classList.add('active');
+  document.getElementById(`stops-list-${dayId}`).classList.add('open');
+  plotAll();
+  fitDay(dayId);
+}
+
+function deactivateDay(dayId) {
+  document.getElementById(`day-header-${dayId}`).classList.remove('active');
+  document.getElementById(`stops-list-${dayId}`).classList.remove('open');
+  activeDay = null;
+  plotAll();
+  closeInfo();
+}
+
+function selectStop(dayId, stopIdx) {
+  if (activeStop) {
+    const [pd, ps] = activeStop;
+    document.getElementById(`stop-item-${pd}-${ps}`)?.classList.remove('active');
+  }
+  activeStop = [dayId, stopIdx];
+  document.getElementById(`stop-item-${dayId}-${stopIdx}`).classList.add('active');
+
+  // On mobile, scroll sidebar item into view
+  document.getElementById(`stop-item-${dayId}-${stopIdx}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  const stop = DAYS[dayId].stops[stopIdx];
+  showStopInfo(DAYS[dayId], stop);
+  map.flyTo({ center: [stop.lng, stop.lat], zoom: 13, speed: 1.2 });
+}
+
+function googleMapsUrl(lat, lng) {
+  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+}
+
+function showStopInfo(day, stop) {
+  document.getElementById('infoDayLabel').textContent = `${day.day} · ${day.date}`;
+  document.getElementById('infoName').textContent = stop.name;
+  document.getElementById('infoTime').textContent = stop.time + (stop.drive ? ` · ${stop.drive}` : '');
+  document.getElementById('infoDesc').textContent = stop.desc;
+  const addrEl = document.getElementById('infoAddress');
+  if (stop.address) { addrEl.textContent = stop.address; addrEl.style.display = 'block'; }
+  else { addrEl.style.display = 'none'; }
+  document.getElementById('directionsBtn').href = googleMapsUrl(stop.lat, stop.lng);
+  document.getElementById('infoPanel').classList.add('visible');
+}
+
+function showAirbnbInfo(a) {
+  document.getElementById('infoDayLabel').textContent = 'Accommodation';
+  document.getElementById('infoName').textContent = a.name;
+  document.getElementById('infoTime').textContent = `${a.checkin} · ${a.nights}`;
+  document.getElementById('infoDesc').textContent = '';
+  const addrEl = document.getElementById('infoAddress');
+  addrEl.textContent = a.address; addrEl.style.display = 'block';
+  document.getElementById('directionsBtn').href = googleMapsUrl(a.lat, a.lng);
+  document.getElementById('infoPanel').classList.add('visible');
+  map.flyTo({ center: [a.lng, a.lat], zoom: 14, speed: 1.2 });
+}
+
+function closeInfo() {
+  document.getElementById('infoPanel').classList.remove('visible');
+  if (activeStop) {
+    const [pd, ps] = activeStop;
+    document.getElementById(`stop-item-${pd}-${ps}`)?.classList.remove('active');
+    activeStop = null;
+  }
+}
+
+function fitDay(dayId) {
+  const stops = DAYS[dayId].stops;
+  const bounds = stops.reduce(
+    (b, s) => b.extend([s.lng, s.lat]),
+    new mapboxgl.LngLatBounds([stops[0].lng, stops[0].lat], [stops[0].lng, stops[0].lat])
+  );
+  map.fitBounds(bounds, { padding: 70, maxZoom: 14, duration: 800 });
+}
+
+// ── INIT ──
+map.on('load', () => {
+  plotAll();
+  plotAirbnbs();
+  activateDay(0);
+});
+</script>
+</body>
+</html>
